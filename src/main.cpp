@@ -151,18 +151,20 @@ void setBuzzer(int pin, int freq, int ms)
 
 void calibra_sensores()
 {
-  Serial.println("Calibrando sensor frontal");
 
-  // aciona led ao calibrar sensor
-  digitalWrite(LED_BUILTIN, HIGH);
+  //// aciona led ao calibrar sensor
+  // digitalWrite(LED_BUILTIN, HIGH);
+  // delay(300);
+  // digitalWrite(LED_BUILTIN, LOW);
 
 #ifdef CALIBRATE_MELODY
   delay(3000);
+  Serial.println("Calibrando sensor frontal");
   int size = sizeof(durations) / sizeof(int);
   for (int note = 0; note < size; note++) {
     // to calculate the note duration, take one second divided by the note type.
     // e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
-    int duration = 1000 / durations[note];
+    int duration = 800 / durations[note];
     tone(BUZZER_PIN, melody[note], duration);
     // to distinguish the notes, set a minimum time between them.
     // the note's duration + 30% seems to work well:
@@ -175,7 +177,7 @@ void calibra_sensores()
     noTone(BUZZER_PIN);
   }
 #else
-
+  Serial.println("Calibrando sensor frontal");
 #ifdef CALIBRATE_BUZZER
   setBuzzer(BUZZER_PIN, 600, 1000);
 #endif
@@ -189,10 +191,8 @@ void calibra_sensores()
   setBuzzer(BUZZER_PIN, 600, 100);
   delay(100);
 #endif
-
 #endif
 
-  digitalWrite(LED_BUILTIN, LOW);
   Serial.println("Fim da calibração");
 }
 
