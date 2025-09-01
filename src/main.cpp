@@ -4,11 +4,10 @@
 #include <pitches.h>
 
 // #define LEFT_BUZZER
-#define SONG_BUZZER
+#define CALIBRATE_MELODY
 #define RIGHT_BUZZER
-#define CALIBTARE_BUZZER
+#define CALIBRATE_BUZZER
 
-//========== Configurações do Sistema(defines e variáveis globais) ==========//
 // sensor frontal deverá ser o QTR-8RC
 #define BUZZER_PIN 13
 
@@ -40,7 +39,6 @@ float kp = 0.2;
 int velocidadeBase = 200;
 
 bool linhaVisivel = true; // indica se o sensor frontal ainda vê a linha
-//=============================================================================//
 
 void controlarMotores(int correcao);
 void pararMotores();
@@ -50,14 +48,15 @@ void lerSensorEsquerdo();
 void atualizaEstado(int erro);
 bool verificaLinhaVisivel(uint16_t sensorValues[]);
 
-int melody[] = { REST, NOTE_AS4, REST, NOTE_AS4, NOTE_B4, NOTE_DS5, NOTE_AS4, REST, NOTE_AS4, REST,
-  NOTE_AS4, NOTE_B4, NOTE_DS5, NOTE_F5, REST, NOTE_F5, REST, NOTE_GS5, NOTE_FS5, NOTE_F5, NOTE_AS4,
-  REST, NOTE_AS4, REST, NOTE_GS5, NOTE_FS5, NOTE_F5, NOTE_AS4, REST, NOTE_AS4, REST, NOTE_AS4,
-  NOTE_B4, NOTE_DS5, NOTE_AS4, REST, NOTE_AS4, REST, NOTE_AS4, NOTE_B4, NOTE_DS5, NOTE_AS4, REST,
-  NOTE_AS4, REST, REST };
-
-int durations[] = { 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 3, 3, 4,
-  4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 1 };
+#ifdef CALIBRATE_MELODY
+// HP melody
+int melody[] = { REST, NOTE_D4, NOTE_G4, NOTE_AS4, NOTE_A4, NOTE_G4, NOTE_D5, NOTE_C5, NOTE_A4,
+  NOTE_G4, NOTE_AS4, NOTE_A4, NOTE_F4, NOTE_GS4, NOTE_D4, NOTE_D4, NOTE_G4, NOTE_AS4, NOTE_A4,
+  NOTE_G4, NOTE_D5, NOTE_F5, NOTE_E5, NOTE_DS5, NOTE_B4, NOTE_DS5, NOTE_D5, NOTE_CS5, NOTE_CS4,
+  NOTE_B4, NOTE_G4 };
+int durations[] = { 2, 4, 4, 8, 4, 2, 4, 2, 2, 4, 8, 4, 2, 4, 1, 4, 4, 8, 4, 2, 4, 2, 4, 2, 4, 4, 8,
+  4, 2, 4, 1 };
+#endif
 
 void setup()
 {
@@ -156,36 +155,41 @@ void calibra_sensores()
 
   // aciona led ao calibrar sensor
   digitalWrite(LED_BUILTIN, HIGH);
-#ifdef CALIBTARE_BUZZER
-  setBuzzer(BUZZER_PIN, 600, 1000);
-#endif
 
-#ifdef SONG_BUZZER
+#ifdef CALIBRATE_MELODY
+  delay(3000);
   int size = sizeof(durations) / sizeof(int);
   for (int note = 0; note < size; note++) {
     // to calculate the note duration, take one second divided by the note type.
     // e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
-    int duration = 500 / durations[note];
+    int duration = 1000 / durations[note];
     tone(BUZZER_PIN, melody[note], duration);
     // to distinguish the notes, set a minimum time between them.
     // the note's duration + 30% seems to work well:
     int pauseBetweenNotes = duration * 1.30;
     delay(pauseBetweenNotes);
-    // stop the tone playing:
-    noTone(BUZZER_PIN);
-  }
-#endif
 
-  for (int i = 0; i < 200; i++)
     qtr.calibrate();
 
-#ifdef CALIBTARE_BUZZER
+    //  stop the tone playing:
+    noTone(BUZZER_PIN);
+  }
+#else
+
+#ifdef CALIBRATE_BUZZER
+  setBuzzer(BUZZER_PIN, 600, 1000);
+#endif
+  for (int i = 0; i < 200; i++)
+    qtr.calibrate();
+#ifdef CALIBRATE_BUZZER
   setBuzzer(BUZZER_PIN, 600, 100);
   delay(100);
   setBuzzer(BUZZER_PIN, 600, 100);
   delay(100);
   setBuzzer(BUZZER_PIN, 600, 100);
   delay(100);
+#endif
+
 #endif
 
   digitalWrite(LED_BUILTIN, LOW);
