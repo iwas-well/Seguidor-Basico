@@ -3,29 +3,40 @@
 #include <QTRSensors.h>
 #include <pitches.h>
 
+#define TARGET_VELOCITY 60
+#define MAX_VELOCITY 100
+#define MIN_VELOCITY 10
+#define KP 0.1
+#define KD 0.4
+
 // #define LEFT_BUZZER
 #define CALIBRATE_MELODY
-#define RIGHT_BUZZER
+// #define RIGHT_BUZZER
 #define CALIBRATE_BUZZER
+#define SERIAL_PRINT
 
 // sensor frontal deverá ser o QTR-8RC
 #define BUZZER_PIN 13
 
 // motor pins
-#define MOTOR_PIN1_E A5
-#define MOTOR_PIN2_E A4
-#define PWM_E A0
-#define MOTOR_PIN1_D A2
-#define MOTOR_PIN2_D A3
-#define PWM_D A1
-DC_Motor m1(PWM_E, MOTOR_PIN1_E, MOTOR_PIN2_E);
-DC_Motor m2(PWM_D, MOTOR_PIN1_D, MOTOR_PIN2_D);
+#define MOTOR_PIN1_A A4
+#define MOTOR_PIN2_A A5
+#define PWM_E 3
+// #define PWM_E A0
+#define MOTOR_PIN1_B A2
+#define MOTOR_PIN2_B A3
+#define PWM_D 11
+// #define PWM_D A1
+
+DC_Motor m1(PWM_E, MOTOR_PIN1_A, MOTOR_PIN2_A);
+DC_Motor m2(PWM_D, MOTOR_PIN1_B, MOTOR_PIN2_B);
 
 // sensors pins
 #define RIGHT_SENSOR_PIN 2
 #define LEFT_SENSOR_PIN 12
-#define EMIT_PIN 11 // if used, the qtr emmiter is only turned on when reading
-const uint8_t qtr_pins[] { 10, 9, 8, 7, 6, 5, 4, 3 };
+// #define EMIT_PIN 11 // if used, the qtr emmiter is only turned on when reading
+#define EMIT_PIN A1 // if used, the qtr emmiter is only turned on when reading
+const uint8_t qtr_pins[] { 10, 9, 8, 7, 6, 5, 4, A0 };
 const uint8_t num_sensors = sizeof(qtr_pins);
 
 QTRSensors qtr;
@@ -34,14 +45,9 @@ uint16_t sensors[8];
 enum Estado { EM_CORRIDA, CURVA_ESQ, CURVA_DIR, RETA, PARANDO };
 Estado estadoAtual = EM_CORRIDA;
 
-float kp = 0.2;
-
-int velocidadeBase = 200;
-
 bool linhaVisivel = true; // indica se o sensor frontal ainda vê a linha
 
 void controlarMotores(int correcao);
-void pararMotores();
 void calibra_sensores();
 void lerSensorDireito();
 void lerSensorEsquerdo();
@@ -73,50 +79,58 @@ void setup()
 
   calibra_sensores();
 
-  Serial.println("Sistema iniciado...");
-  delay(300);
+  delay(500);
 }
 
+int last_error = 0;
+uint16_t sensorValues[num_sensors];
 // Nossa lógica principal
 void loop()
 {
   lerSensorDireito();
 
-  uint16_t sensorValues[num_sensors];
   int posicao = qtr.readLineWhite(sensorValues); // posição entre 0 e 7000 aprox.
   int erro = posicao - 3500; // centro ideal = 3500
-  int correcao = kp * erro;
+  int derivative = erro - last_error;
+  last_error = erro;
 
+  int correcao = (KP * erro) + (KD * derivative);
+
+#ifdef SERIAL_PRINT
   Serial.print("posicao: ");
   Serial.println(posicao);
+#endif
 
   atualizaEstado(erro);
 
-  // aqui que usamos a nossa máquina de estados
-  if (estadoAtual == CURVA_ESQ || estadoAtual == CURVA_DIR) {
-    controlarMotores(correcao);
-  } else {
-    controlarMotores(correcao);
-  }
+  //// aqui que usamos a nossa máquina de estados
+  // if (estadoAtual == CURVA_ESQ || estadoAtual == CURVA_DIR) {
+  //   controlarMotores(correcao);
+  // } else {
+  controlarMotores(correcao);
+  //}
 
   // para registrar as curvas e retas, mantemos isso
   lerSensorEsquerdo();
+
+  delay(1);
 }
 
 //==========Nossas Funções===========//
 // função simples para controlar motores com correcao proporcional
 void controlarMotores(int correcao)
 {
-  int velEsq = velocidadeBase - correcao;
-  int velDir = velocidadeBase + correcao;
+  int velEsq = TARGET_VELOCITY - correcao;
+  int velDir = TARGET_VELOCITY + correcao;
 
   // Prevenção de valores negativos - constrain
-  velEsq = constrain(velEsq, 0, 255);
-  velDir = constrain(velDir, 0, 255);
+  velEsq = constrain(velEsq, MIN_VELOCITY, MAX_VELOCITY);
+  velDir = constrain(velDir, MIN_VELOCITY, MAX_VELOCITY);
 
   m1.forward(velEsq);
   m2.forward(velDir);
 
+#ifdef SERIAL_PRINT
   Serial.print("m1.forward(");
   Serial.print(velEsq);
   Serial.print(")\n");
@@ -124,12 +138,7 @@ void controlarMotores(int correcao)
   Serial.print("m2.forward(");
   Serial.print(velDir);
   Serial.print(")\n\n");
-}
-
-void pararMotores()
-{
-  m1.stop();
-  m2.stop();
+#endif
 }
 
 // Se frequncia eh 0, buzzer eh desligado
@@ -158,8 +167,10 @@ void calibra_sensores()
   // digitalWrite(LED_BUILTIN, LOW);
 
 #ifdef CALIBRATE_MELODY
-  delay(3000);
+  delay(4000);
+#ifdef SERIAL_PRINT
   Serial.println("Calibrando sensor frontal");
+#endif
   int size = sizeof(durations) / sizeof(int);
   for (int note = 0; note < size; note++) {
     // to calculate the note duration, take one second divided by the note type.
@@ -177,7 +188,9 @@ void calibra_sensores()
     noTone(BUZZER_PIN);
   }
 #else
+#ifdef SERIAL_PRINT
   Serial.println("Calibrando sensor frontal");
+#endif
 #ifdef CALIBRATE_BUZZER
   setBuzzer(BUZZER_PIN, 600, 1000);
 #endif
@@ -193,7 +206,9 @@ void calibra_sensores()
 #endif
 #endif
 
+#ifdef SERIAL_PRINT
   Serial.println("Fim da calibração");
+#endif
 }
 
 void lerSensorDireito()
@@ -205,7 +220,9 @@ void lerSensorDireito()
 
 #ifdef RIGHT_BUZZER
   if (leitura == HIGH) {
+#ifdef SERIAL_PRINT
     Serial.println("Sensor direito ativado");
+#endif
     setBuzzer(BUZZER_PIN, 600, 0);
   } else
     setBuzzer(BUZZER_PIN, 0, 0);
@@ -222,7 +239,9 @@ void lerSensorEsquerdo()
 
 #ifdef LEFT_BUZZER
   if (leitura != HIGH) {
+#ifdef SERIAL_PRINT
     Serial.println("Sensor esquerdo ativado");
+#endif
     setBuzzer(BUZZER_PIN, 600, 0);
   } else
     setBuzzer(BUZZER_PIN, 0, 0);
